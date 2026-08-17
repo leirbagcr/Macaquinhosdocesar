@@ -584,32 +584,65 @@ export function analiseComparacao(a, b, formatarMoeda) {
 }
 
 /**
- * Painel lateral com a análise do gráfico e botão de mostrar/ocultar.
- * `montarBlocos` é chamada a cada atualização para permitir análise dinâmica.
+ * Botão "Análise" que abre um painel lateral (drawer) com a leitura do gráfico,
+ * deixando o gráfico em tamanho normal. `montarBlocos` é chamada a cada
+ * atualização para permitir análise dinâmica.
  */
 export function criarPainelAnalise(montarBlocos, { titulo = "Análise do gráfico" } = {}) {
-  const painel = document.createElement("aside");
-  painel.className = "analise-painel";
+  const painel = document.createElement("div");
+  painel.className = "analise-acao";
+
+  const botao = document.createElement("button");
+  botao.type = "button";
+  botao.className = "analise-abrir";
+  botao.textContent = "Análise";
+  botao.setAttribute("aria-haspopup", "dialog");
+  botao.setAttribute("aria-expanded", "false");
+  botao.setAttribute("aria-controls", "analise-drawer");
+  painel.appendChild(botao);
+
+  const fundo = document.createElement("div");
+  fundo.className = "analise-fundo";
+
+  const drawer = document.createElement("aside");
+  drawer.className = "analise-drawer";
+  drawer.id = "analise-drawer";
+  drawer.setAttribute("role", "dialog");
+  drawer.setAttribute("aria-label", titulo);
 
   const cabecalho = document.createElement("div");
   cabecalho.className = "analise-cabecalho";
   const h4 = document.createElement("h4");
   h4.textContent = titulo;
-  const botao = document.createElement("button");
-  botao.type = "button";
-  botao.className = "analise-toggle";
-  botao.textContent = "Ocultar";
-  botao.setAttribute("aria-expanded", "true");
-  cabecalho.append(h4, botao);
+  const fecharBotao = document.createElement("button");
+  fecharBotao.type = "button";
+  fecharBotao.className = "analise-toggle";
+  fecharBotao.textContent = "Fechar";
+  cabecalho.append(h4, fecharBotao);
 
   const corpo = document.createElement("div");
   corpo.className = "analise-corpo";
-  painel.append(cabecalho, corpo);
+  drawer.append(cabecalho, corpo);
+  document.body.append(fundo, drawer);
 
-  botao.addEventListener("click", () => {
-    const oculto = painel.classList.toggle("recolhido");
-    botao.textContent = oculto ? "Mostrar" : "Ocultar";
-    botao.setAttribute("aria-expanded", String(!oculto));
+  const abrir = () => {
+    drawer.classList.add("aberto");
+    fundo.classList.add("aberto");
+    botao.setAttribute("aria-expanded", "true");
+    fecharBotao.focus();
+  };
+  const fechar = () => {
+    drawer.classList.remove("aberto");
+    fundo.classList.remove("aberto");
+    botao.setAttribute("aria-expanded", "false");
+    botao.focus();
+  };
+
+  botao.addEventListener("click", abrir);
+  fecharBotao.addEventListener("click", fechar);
+  fundo.addEventListener("click", fechar);
+  document.addEventListener("keydown", (evento) => {
+    if (evento.key === "Escape" && drawer.classList.contains("aberto")) fechar();
   });
 
   const atualizar = () => {

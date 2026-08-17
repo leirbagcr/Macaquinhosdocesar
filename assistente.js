@@ -1,8 +1,9 @@
 /**
- * Assistente do site: responde perguntas sobre as cotas, os indicadores, a
- * navegação e os números de cada curso. Funciona no próprio navegador, sem
- * serviço externo — a resposta é montada a partir de db.js / db_utfpr.js e dos
- * conceitos de conceitos.js, então nunca inventa dado que não está na base.
+ * Assistente do site com IA: as perguntas são respondidas por um modelo de
+ * linguagem (via Puter.js, sem chave de API), sempre ancorado nos dados de
+ * db.js / db_utfpr.js e nos conceitos de conceitos.js. Se a IA estiver
+ * indisponível (sem internet ou serviço fora do ar), o assistente cai no
+ * mecanismo local de respostas, que roda inteiro no navegador.
  */
 import { CATEGORIAS, SIGLA, linhasCurso, resumosCatalogo, serieAnual } from "./catalogo.js";
 import {
@@ -402,7 +403,115 @@ export function responder(texto) {
   return respostaFallback();
 }
 
-/* ── Interface do assistente ─────────────────────────── */
+/* ── IA (Puter.js) ───────────────────────────────────── */
+
+const PUTER_URL = "https://js.puter.com/v2/";
+const IA_TIMEOUT_MS = 25000;
+let puterPromise = null;
+let contextoIA = null;
+const historicoIA = [];
+
+function carregarPuter() {
+  if (window.puter?.ai?.chat) return Promise.resolve(window.puter);
+  if (!puterPromise) {
+    puterPromise = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = PUTER_URL;
+      script.async = true;
+      script.onload = () =>
+        window.puter?.ai?.chat ? resolve(window.puter) : reject(new Error("IA indisponível"));
+      script.onerror = () => reject(new Error("IA indisponível"));
+      document.head.appendChild(script);
+    });
+  }
+  return puterPromise;
+}
+
+/** Resumo compacto das bases, enviado à IA para ancorar as respostas. */
+function montarContextoIA() {
+  if (contextoIA) return contextoIA;
+  const cursosTexto = resumos
+    .map((r) => {
+      const partes = [
+        `${r.nome} (${r.sigla}, ${r.modalidade}, ${r.anosCurso} anos, página ${r.href})`,
+        `concorrência média ${num(r.mediaConcorrencia)} candidatos/vaga em ${r.anos[0]}–${r.anos[r.anos.length - 1]}`,
+        `atual ${num(r.concorrenciaAtual)} (${r.anos[r.anos.length - 1]})`,
+        `variação no período ${num(r.variacaoPeriodo)}%`,
+        `pico ${num(r.pico.concorrencia)} em ${r.pico.ano}`,
+      ];
+      if (r.notaMedia != null) partes.push(`nota mínima média ${num(r.notaMedia)}`);
+      if (r.salario != null)
+        partes.push(`salário médio ${fmtMoeda.format(r.salario)} (${r.cargo})`);
+      return `- ${partes.join("; ")}`;
+    })
+    .join("\n");
+  const cotasTexto = COTAS.map((c) => `- ${c.tipo} (${c.apelido}): ${c.resumo}`).join("\n");
+  const paginasTexto = PAGINAS.map((p) => `- ${p.nome} (${p.href}): ${p.texto}`).join("\n");
+  const limitacoesTexto = LIMITACOES.map((l) => `- ${l}`).join("\n");
+  contextoIA =
+    "Você é o assistente de um site que analisa a concorrência (candidatos por vaga) em " +
+    "cotas públicas nos vestibulares da UEPG (2016–2025) e da UTFPR — Câmpus Ponta Grossa " +
+    "(2023–2025). Responda sempre em português do Brasil, de forma curta e objetiva (até 5 " +
+    "frases), usando SOMENTE os dados abaixo e os dados extras enviados em cada pergunta. " +
+    "Nunca invente números: se a informação não estiver nos dados, diga que ela não está na " +
+    "base do site e sugira o que você sabe responder. Pode usar HTML simples (<strong>, <a>).\n\n" +
+    `CURSOS DO SITE:\n${cursosTexto}\n\n` +
+    `TIPOS DE COTA:\n${cotasTexto}\n\n` +
+    `PÁGINAS DO SITE:\n${paginasTexto}\n\n` +
+    `LIMITAÇÕES DOS DADOS:\n${limitacoesTexto}`;
+  return contextoIA;
+}
+
+function extrairTextoIA(resposta) {
+  const bruto = resposta?.message?.content ?? resposta;
+  if (typeof bruto === "string") return bruto;
+  if (Array.isArray(bruto)) return bruto.map((parte) => parte?.text ?? "").join("");
+  return "";
+}
+
+/** Converte a resposta da IA (texto/markdown leve) em HTML seguro. */
+function formatarRespostaIA(texto) {
+  const temHtml = /<(strong|a|em|br)\b/i.test(texto);
+  let html = texto.trim();
+  if (!temHtml) {
+    html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  return html
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\n{2,}/g, "<br /><br />")
+    .replace(/\n/g, "<br />");
+}
+
+/**
+ * Pergunta à IA, enviando o contexto do site, o histórico da conversa e a
+ * resposta do mecanismo local como dados extras de apoio.
+ */
+async function responderIA(texto, respostaLocal) {
+  const puter = await carregarPuter();
+  const mensagens = [
+    { role: "system", content: montarContextoIA() },
+    ...historicoIA.slice(-6),
+    {
+      role: "user",
+      content:
+        `Pergunta do visitante: ${texto}\n\n` +
+        "Dados extras calculados pelo site para esta pergunta (use-os como fonte, " +
+        `reescrevendo com naturalidade):\n${respostaLocal}`,
+    },
+  ];
+  const resposta = await Promise.race([
+    puter.ai.chat(mensagens),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("tempo esgotado")), IA_TIMEOUT_MS),
+    ),
+  ]);
+  const conteudo = extrairTextoIA(resposta).trim();
+  if (!conteudo) throw new Error("resposta vazia");
+  historicoIA.push({ role: "user", content: texto }, { role: "assistant", content: conteudo });
+  return formatarRespostaIA(conteudo);
+}
+
+/* ── Interface do assistente ───────────────────── */
 
 function balao(autor, html) {
   const item = document.createElement("div");
@@ -433,7 +542,7 @@ export function montarAssistente() {
     <header class="assistente-topo">
       <div>
         <p class="assistente-titulo">Assistente do site</p>
-        <p class="assistente-sub">Responde com os dados de db.js e db_utfpr.js</p>
+        <p class="assistente-sub">IA ancorada nos dados de db.js e db_utfpr.js</p>
       </div>
       <button type="button" class="assistente-fechar" aria-label="Fechar assistente">✖</button>
     </header>
@@ -461,9 +570,21 @@ export function montarAssistente() {
     corpo.scrollTop = corpo.scrollHeight;
   };
 
-  const perguntar = (texto) => {
+  const perguntar = async (texto) => {
     escrever("usuario", texto.replace(/[<>]/g, ""));
-    escrever("bot", responder(texto));
+    const pensando = balao("bot", '<em class="chat-pensando">Pensando\u2026</em>');
+    corpo.appendChild(pensando);
+    corpo.scrollTop = corpo.scrollHeight;
+    const bolha = pensando.querySelector(".chat-bolha");
+    const respostaLocal = responder(texto);
+    try {
+      bolha.innerHTML = await responderIA(texto, respostaLocal);
+    } catch {
+      bolha.innerHTML =
+        `${respostaLocal}<br /><small class="chat-origem">IA indisponível no momento — ` +
+        "resposta gerada pelo mecanismo local do site.</small>";
+    }
+    corpo.scrollTop = corpo.scrollHeight;
   };
 
   SUGESTOES.forEach((texto) => {
@@ -477,7 +598,7 @@ export function montarAssistente() {
 
   escrever(
     "bot",
-    "Olá! Sou o assistente deste trabalho sobre concorrência em cotas públicas. " +
+    "Olá! Sou o assistente com IA deste trabalho sobre concorrência em cotas públicas. " +
       "Pergunte o que quiser sobre as cotas, os cursos e os números do site — as sugestões " +
       "abaixo são um bom começo.",
   );

@@ -8,11 +8,12 @@ Além do painel principal (gráfico de linha comparando os 6 cursos da UEPG, tab
 filtrável e as 8 questões de análise), há **12 páginas individuais de curso** geradas por
 um template único (`curso.js`), acessíveis pelo menu lateral.
 
-Todo gráfico de linha tem, ao lado, um painel de **análise objetiva** (`analise.js`) que
-explica o que a série mostra, o que provoca os movimentos (oferta de vagas × procura),
-a tendência estimada por regressão linear, a relação com a nota mínima e as ressalvas de
-leitura. O painel é calculado dos próprios dados, acompanha os filtros do painel principal
-e pode ser recolhido pelo botão *Ocultar*.
+Todo gráfico de linha fica em tamanho normal e tem um botão **Análise** que abre um
+painel lateral (`analise.js`) com a análise objetiva: o que a série mostra, o que provoca
+os movimentos (oferta de vagas × procura), a tendência estimada por regressão linear, a
+relação com a nota mínima e as ressalvas de leitura. O painel é calculado dos próprios
+dados, acompanha os filtros do painel principal e fecha pelo botão *Fechar*, pela tecla
+Esc ou clicando fora dele.
 
 Há também **Ranking** (`ranking.html`) e **Comparador de cursos** (`comparar.html`), ambos no
 menu lateral. Ver [Ranking e comparação](#ranking-e-comparação).
@@ -20,9 +21,10 @@ menu lateral. Ver [Ranking e comparação](#ranking-e-comparação).
 A página **Sobre** (`sobre.html`) explica o projeto, o conceito de cota e cada uma das cinco
 modalidades (Universal, Escola Pública, Escola Pública - Negros, Negros e PcD) com exemplo
 montado a partir dos próprios dados, glossário dos indicadores, perguntas frequentes e
-limitações. Em todas as páginas há um **assistente** (`assistente.js`), no botão do canto
-inferior direito, que responde perguntas sobre as cotas, os cursos, os rankings e a navegação
-usando apenas as bases do site. Ver [Sobre e assistente](#sobre-e-assistente).
+limitações. Em todas as páginas há um **assistente com IA** (`assistente.js`), no botão do
+canto inferior direito, que responde perguntas sobre as cotas, os cursos, os rankings e a
+navegação usando um modelo de linguagem ancorado nas bases do site (com fallback local
+quando a IA está indisponível). Ver [Sobre e assistente](#sobre-e-assistente).
 
 ## Links
 
@@ -56,7 +58,7 @@ usando apenas as bases do site. Ver [Sobre e assistente](#sobre-e-assistente).
 ├── comparar.js         # página de comparação
 ├── sobre.js            # página Sobre: cards das cotas, exemplo real, glossário e FAQ
 ├── conceitos.js        # definições das cotas, indicadores, marco legal e limitações
-├── assistente.js       # assistente de perguntas e respostas presente em todas as páginas
+├── assistente.js       # assistente com IA presente em todas as páginas (fallback local)
 ├── nav.js              # menu lateral e rodapé compartilhados
 ├── util.js             # formatadores pt-BR, paletas, estatística e tema do Chart.js
 ├── db.js               # base UEPG (export const db) — 49 cursos, 2016–2025
@@ -158,9 +160,12 @@ oficial.
 Os textos conceituais ficam em `conceitos.js`, reaproveitados pelo assistente — não há definição
 duplicada entre a página e o chat.
 
-`assistente.js` monta um chat flutuante em todas as páginas. Ele roda no navegador, sem serviço
-externo nem chave de API: interpreta a pergunta (normalização de acentos + termos-chave) e monta a
-resposta a partir de `db.js`, `db_utfpr.js`, `catalogo.js` e `conceitos.js`. Responde, por exemplo:
+`assistente.js` monta um chat flutuante em todas as páginas. As respostas são geradas por um
+modelo de linguagem (via [Puter.js](https://developer.puter.com/), sem chave de API), que recebe
+um resumo das bases do site e os números calculados pelo mecanismo local, então responde em
+linguagem natural sem inventar dados. Se a IA estiver indisponível, o assistente usa o mecanismo
+local: interpreta a pergunta (normalização de acentos + termos-chave) e monta a resposta a partir
+de `db.js`, `db_utfpr.js`, `catalogo.js` e `conceitos.js`. Responde, por exemplo:
 
 - `o que é a cota universal?` / `diferença entre negros e escola pública - negros`
 - `concorrência de Medicina em 2025` / `Administração 2019 escola pública`
