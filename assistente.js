@@ -6,7 +6,7 @@
  * inteiro no navegador.
  */
 import { CATEGORIAS, SIGLA, linhasCurso, resumosCatalogo, serieAnual } from "./catalogo.js";
-import { GEMINI_API_KEY, GEMINI_MODELO } from "./ia-config.js";
+import { GEMINI_API_KEY, GEMINI_MODELO, IA_PROXY_URL } from "./ia-config.js";
 import {
   COTAS,
   COTA_POR_TIPO,
@@ -411,7 +411,7 @@ const IA_TIMEOUT_MS = 20000;
 let contextoIA = null;
 const historicoIA = [];
 
-export const iaAtiva = () => Boolean(GEMINI_API_KEY);
+export const iaAtiva = () => Boolean(IA_PROXY_URL || GEMINI_API_KEY);
 
 /** Resumo compacto das bases, enviado à IA para ancorar as respostas. */
 function montarContextoIA() {
@@ -487,12 +487,12 @@ async function responderIA(texto, respostaLocal) {
       ],
     },
   ];
-  const resposta = await fetch(GEMINI_URL, {
+  const url = IA_PROXY_URL || GEMINI_URL;
+  const headers = { "Content-Type": "application/json" };
+  if (!IA_PROXY_URL) headers["x-goog-api-key"] = GEMINI_API_KEY;
+  const resposta = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": GEMINI_API_KEY,
-    },
+    headers,
     body: JSON.stringify({
       system_instruction: { parts: [{ text: montarContextoIA() }] },
       contents,

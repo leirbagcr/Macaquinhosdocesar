@@ -59,7 +59,9 @@ quando a IA está indisponível). Ver [Sobre e assistente](#sobre-e-assistente).
 ├── sobre.js            # página Sobre: cards das cotas, exemplo real, glossário e FAQ
 ├── conceitos.js        # definições das cotas, indicadores, marco legal e limitações
 ├── assistente.js       # assistente com IA presente em todas as páginas (fallback local)
-├── ia-config.js        # chave e modelo do Google Gemini usados pelo assistente
+├── ia-config.js        # configuração da IA (URL do mini-servidor ou chave do Gemini)
+├── worker/
+│   └── gemini-proxy.js # mini-servidor (Cloudflare Worker) que esconde a chave do Gemini
 ├── nav.js              # menu lateral e rodapé compartilhados
 ├── util.js             # formatadores pt-BR, paletas, estatística e tema do Chart.js
 ├── db.js               # base UEPG (export const db) — 49 cursos, 2016–2025
@@ -162,9 +164,11 @@ Os textos conceituais ficam em `conceitos.js`, reaproveitados pelo assistente �
 duplicada entre a página e o chat.
 
 `assistente.js` monta um chat flutuante em todas as páginas. As respostas são geradas pelo
-[Google Gemini](https://aistudio.google.com/) (chave configurada em `ia-config.js`, com criação
-gratuita e restrição por domínio), que recebe um resumo das bases do site e os números calculados
-pelo mecanismo local, então responde em linguagem natural sem inventar dados.
+[Google Gemini](https://aistudio.google.com/), de preferência através do mini-servidor
+`worker/gemini-proxy.js` (Cloudflare Workers, grátis), que guarda a chave escondida — a URL do
+Worker é configurada em `ia-config.js` (o passo a passo completo está nesses dois arquivos).
+A IA recebe um resumo das bases do site e os números calculados pelo mecanismo local, então
+responde em linguagem natural sem inventar dados.
 Sem chave configurada ou com a IA indisponível, o assistente usa o mecanismo
 local: interpreta a pergunta (normalização de acentos + termos-chave) e monta a resposta a partir
 de `db.js`, `db_utfpr.js`, `catalogo.js` e `conceitos.js`. Responde, por exemplo:
