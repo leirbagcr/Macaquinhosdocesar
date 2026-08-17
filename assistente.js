@@ -1,10 +1,12 @@
 /**
- * Assistente do site: responde perguntas sobre as cotas, os indicadores, a
- * navegação e os números de cada curso. Funciona no próprio navegador, sem
- * serviço externo — a resposta é montada a partir de db.js / db_utfpr.js e dos
- * conceitos de conceitos.js, então nunca inventa dado que não está na base.
+ * Assistente do site com IA: as perguntas são respondidas pelo Google Gemini
+ * (chave configurada em ia-config.js), sempre ancorado nos dados de
+ * db.js / db_utfpr.js e nos conceitos de conceitos.js. Sem chave ou com a IA
+ * indisponível, o assistente usa o mecanismo local de respostas, que roda
+ * inteiro no navegador.
  */
 import { CATEGORIAS, SIGLA, linhasCurso, resumosCatalogo, serieAnual } from "./catalogo.js";
+import { GEMINI_API_KEY, GEMINI_MODELO } from "./ia-config.js";
 import {
   COTAS,
   COTA_POR_TIPO,
@@ -402,11 +404,124 @@ export function responder(texto) {
   return respostaFallback();
 }
 
-/* ── Interface do assistente ─────────────────────────── */
+/* ── IA (Google Gemini) ─────────────────────────────── */
+
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODELO}:generateContent`;
+const IA_TIMEOUT_MS = 20000;
+let contextoIA = null;
+const historicoIA = [];
+
+export const iaAtiva = () => Boolean(GEMINI_API_KEY);
+
+/** Resumo compacto das bases, enviado à IA para ancorar as respostas. */
+function montarContextoIA() {
+  if (contextoIA) return contextoIA;
+  const cursosTexto = resumos
+    .map((r) => {
+      const partes = [
+        `${r.nome} (${r.sigla}, ${r.modalidade}, ${r.anosCurso} anos, página ${r.href})`,
+        `concorrência média ${num(r.mediaConcorrencia)} candidatos/vaga em ${r.anos[0]}–${r.anos[r.anos.length - 1]}`,
+        `atual ${num(r.concorrenciaAtual)} (${r.anos[r.anos.length - 1]})`,
+        `variação no período ${num(r.variacaoPeriodo)}%`,
+        `pico ${num(r.pico.concorrencia)} em ${r.pico.ano}`,
+      ];
+      if (r.notaMedia != null) partes.push(`nota mínima média ${num(r.notaMedia)}`);
+      if (r.salario != null)
+        partes.push(`salário médio ${fmtMoeda.format(r.salario)} (${r.cargo})`);
+      return `- ${partes.join("; ")}`;
+    })
+    .join("\n");
+  const cotasTexto = COTAS.map((c) => `- ${c.tipo} (${c.apelido}): ${c.resumo}`).join("\n");
+  const paginasTexto = PAGINAS.map((p) => `- ${p.nome} (${p.href}): ${p.texto}`).join("\n");
+  const limitacoesTexto = LIMITACOES.map((l) => `- ${l}`).join("\n");
+  contextoIA =
+    "Você é o assistente de um site que analisa a concorrência (candidatos por vaga) em " +
+    "cotas públicas nos vestibulares da UEPG (2016–2025) e da UTFPR — Câmpus Ponta Grossa " +
+    "(2023–2025). Responda sempre em português do Brasil, de forma curta e objetiva (até 5 " +
+    "frases), usando SOMENTE os dados abaixo e os dados extras enviados em cada pergunta. " +
+    "Nunca invente números: se a informação não estiver nos dados, diga que ela não está na " +
+    "base do site e sugira o que você sabe responder. Pode usar HTML simples (<strong>, <a>).\n\n" +
+    `CURSOS DO SITE:\n${cursosTexto}\n\n` +
+    `TIPOS DE COTA:\n${cotasTexto}\n\n` +
+    `PÁGINAS DO SITE:\n${paginasTexto}\n\n` +
+    `LIMITAÇÕES DOS DADOS:\n${limitacoesTexto}`;
+  return contextoIA;
+}
+
+function extrairTextoIA(resposta) {
+  const partes = resposta?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(partes)) return "";
+  return partes.map((parte) => parte?.text ?? "").join("");
+}
+
+/** Converte a resposta da IA (texto/markdown leve) em HTML seguro. */
+function formatarRespostaIA(texto) {
+  const temHtml = /<(strong|a|em|br)\b/i.test(texto);
+  let html = texto.trim();
+  if (!temHtml) {
+    html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  return html
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\n{2,}/g, "<br /><br />")
+    .replace(/\n/g, "<br />");
+}
+
+/**
+ * Pergunta à IA, enviando o contexto do site, o histórico da conversa e a
+ * resposta do mecanismo local como dados extras de apoio.
+ */
+async function responderIA(texto, respostaLocal) {
+  if (!iaAtiva()) throw new Error("IA não configurada");
+  const contents = [
+    ...historicoIA.slice(-6),
+    {
+      role: "user",
+      parts: [
+        {
+          text:
+            `Pergunta do visitante: ${texto}\n\n` +
+            "Dados extras calculados pelo site para esta pergunta (use-os como fonte, " +
+            `reescrevendo com naturalidade):\n${respostaLocal}`,
+        },
+      ],
+    },
+  ];
+  const resposta = await fetch(GEMINI_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": GEMINI_API_KEY,
+    },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: montarContextoIA() }] },
+      contents,
+      generationConfig: { temperature: 0.4, maxOutputTokens: 500 },
+    }),
+    signal: AbortSignal.timeout(IA_TIMEOUT_MS),
+  });
+  if (!resposta.ok) throw new Error(`IA respondeu ${resposta.status}`);
+  const conteudo = extrairTextoIA(await resposta.json()).trim();
+  if (!conteudo) throw new Error("resposta vazia");
+  historicoIA.push(
+    { role: "user", parts: [{ text: texto }] },
+    { role: "model", parts: [{ text: conteudo }] },
+  );
+  return formatarRespostaIA(conteudo);
+}
+
+/* ── Interface do assistente ───────────────────── */
 
 function balao(autor, html) {
   const item = document.createElement("div");
   item.className = `chat-msg chat-msg--${autor}`;
+  if (autor === "bot") {
+    const avatar = document.createElement("span");
+    avatar.className = "chat-avatar";
+    avatar.setAttribute("aria-hidden", "true");
+    avatar.textContent = "✦";
+    item.appendChild(avatar);
+  }
   const bolha = document.createElement("div");
   bolha.className = "chat-bolha";
   bolha.innerHTML = html;
@@ -422,20 +537,26 @@ export function montarAssistente() {
   botao.type = "button";
   botao.className = "assistente-botao";
   botao.setAttribute("aria-label", "Abrir assistente do site");
-  botao.innerHTML = '<span aria-hidden="true">💬</span><span class="rotulo">Assistente</span>';
+  botao.innerHTML =
+    '<span class="assistente-botao-icone" aria-hidden="true">✦</span>' +
+    '<span class="rotulo">Assistente IA</span>';
 
   const painel = document.createElement("section");
   painel.id = "assistente";
   painel.className = "assistente";
   painel.setAttribute("aria-label", "Assistente do site");
   painel.hidden = true;
+  const subtitulo = iaAtiva()
+    ? "Gemini · dados oficiais UEPG e UTFPR-PG"
+    : "Dados oficiais UEPG e UTFPR-PG";
   painel.innerHTML = `
     <header class="assistente-topo">
-      <div>
-        <p class="assistente-titulo">Assistente do site</p>
-        <p class="assistente-sub">Responde com os dados de db.js e db_utfpr.js</p>
+      <span class="assistente-avatar" aria-hidden="true">✦</span>
+      <div class="assistente-ident">
+        <p class="assistente-titulo">Assistente IA</p>
+        <p class="assistente-sub"><span class="assistente-status" aria-hidden="true"></span>${subtitulo}</p>
       </div>
-      <button type="button" class="assistente-fechar" aria-label="Fechar assistente">✖</button>
+      <button type="button" class="assistente-fechar" aria-label="Fechar assistente">✕</button>
     </header>
     <div class="assistente-corpo" id="assistente-corpo" role="log" aria-live="polite"></div>
     <div class="assistente-sugestoes" id="assistente-sugestoes"></div>
@@ -461,9 +582,28 @@ export function montarAssistente() {
     corpo.scrollTop = corpo.scrollHeight;
   };
 
-  const perguntar = (texto) => {
+  const perguntar = async (texto) => {
     escrever("usuario", texto.replace(/[<>]/g, ""));
-    escrever("bot", responder(texto));
+    const respostaLocal = responder(texto);
+    if (!iaAtiva()) {
+      escrever("bot", respostaLocal);
+      return;
+    }
+    const pensando = balao(
+      "bot",
+      '<span class="chat-digitando" aria-label="Pensando"><span></span><span></span><span></span></span>',
+    );
+    corpo.appendChild(pensando);
+    corpo.scrollTop = corpo.scrollHeight;
+    const bolha = pensando.querySelector(".chat-bolha");
+    try {
+      bolha.innerHTML = await responderIA(texto, respostaLocal);
+    } catch {
+      bolha.innerHTML =
+        `${respostaLocal}<br /><small class="chat-origem">IA indisponível no momento — ` +
+        "resposta gerada pelo mecanismo local do site.</small>";
+    }
+    corpo.scrollTop = corpo.scrollHeight;
   };
 
   SUGESTOES.forEach((texto) => {
