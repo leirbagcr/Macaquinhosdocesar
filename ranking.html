@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ranking dos cursos — Concorrência em Cotas Públicas</title>
+    <meta
+      name="description"
+      content="Ranking dos 12 cursos da UEPG e da UTFPR-PG por concorrência, remuneração, duração, retorno por ano de curso, nota de corte, crescimento e estabilidade."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link href="style.css" rel="stylesheet" />
+  </head>
+  <body data-bs-theme="dark">
+    <div class="noise-overlay"></div>
+
+    <header class="hero">
+      <div class="hero-grid-lines"></div>
+      <div class="container">
+        <span class="badge-pill">Ranking · 12 cursos</span>
+        <h1 class="hero-title">Ranking<br /><em>por categoria</em></h1>
+        <p class="hero-subtitle">
+          Os 12 cursos com histórico no site ordenados por concorrência, remuneração, duração,
+          retorno por ano de curso, nota de corte, crescimento da procura e estabilidade —
+          com a análise objetiva de cada ranking ao lado.
+        </p>
+        <div class="hero-meta">
+          <span>7 categorias</span>
+          <span>UEPG + UTFPR-PG</span>
+          <span id="hero-periodo"></span>
+        </div>
+      </div>
+    </header>
+
+    <main id="conteudo">
+      <section class="section" id="ranking">
+        <div class="container">
+          <div class="section-header">
+            <span class="section-tag">Categorias</span>
+            <h2>Escolha o <em>critério</em></h2>
+            <p id="categoria-descricao"></p>
+          </div>
+
+          <div class="painel mb-4">
+            <div class="painel-controles">
+              <div class="campo">
+                <label for="grupo-categorias">Categoria do ranking</label>
+                <div class="chips" id="grupo-categorias"></div>
+              </div>
+              <div class="campo">
+                <label for="select-instituicao">Instituição</label>
+                <div class="select-wrapper">
+                  <select id="select-instituicao">
+                    <option value="todas">UEPG e UTFPR-PG</option>
+                    <option value="uepg">Somente UEPG</option>
+                    <option value="utfpr">Somente UTFPR-PG</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grafico-layout" id="grafico-layout">
+            <div class="grafico-container">
+              <h3 id="ranking-titulo"></h3>
+              <p class="grafico-legenda" id="ranking-legenda"></p>
+              <div class="chart-wrapper">
+                <canvas
+                  id="grafico-ranking"
+                  role="img"
+                  aria-label="Gráfico de barras com o ranking dos cursos na categoria selecionada"
+                ></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section--alt" id="tabela">
+        <div class="container">
+          <div class="section-header">
+            <span class="section-tag">Classificação</span>
+            <h2>Tabela do <em>ranking</em></h2>
+            <p>
+              Posição na categoria escolhida, com as demais métricas de cada curso para
+              comparação direta.
+            </p>
+          </div>
+          <div class="tabela-container">
+            <table class="tabela-dados">
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Curso</th>
+                  <th scope="col">Instituição</th>
+                  <th scope="col" class="num" id="th-categoria">Valor</th>
+                  <th scope="col" class="num">Cand./vaga</th>
+                  <th scope="col" class="num">Salário médio*</th>
+                  <th scope="col" class="num">Duração</th>
+                  <th scope="col" class="num">Retorno/ano</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-ranking"></tbody>
+            </table>
+            <p class="tabela-legenda" id="tabela-legenda"></p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script type="module" src="ranking.js"></script>
+    <script type="module" src="assistente.js"></script>
+  </body>
+</html>

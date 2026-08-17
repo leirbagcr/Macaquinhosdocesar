@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Concorrência em Cotas Públicas — UEPG / UTFPR-PG (2016–2025)</title>
+    <meta
+      name="description"
+      content="Análise descritiva da concorrência em cotas públicas nos vestibulares da UEPG e da UTFPR-PG entre 2016 e 2025: candidatos por vaga, notas mínimas e salário médio."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link href="style.css" rel="stylesheet" />
+  </head>
+  <body data-bs-theme="dark">
+    <div class="noise-overlay"></div>
+
+    <header class="hero">
+      <div class="hero-grid-lines"></div>
+      <div class="container">
+        <span class="badge-pill">UEPG · UTFPR-PG · 2016–2025</span>
+        <h1 class="hero-title">Concorrência<br /><em>em Cotas Públicas</em></h1>
+        <p class="hero-subtitle">
+          Análise descritiva de candidatos por vaga, vagas ofertadas, notas mínimas de
+          aprovação e salário médio das profissões, com dados oficiais dos vestibulares da
+          UEPG e da UTFPR — Câmpus Ponta Grossa.
+        </p>
+        <div class="hero-meta">
+          <span>10 edições</span>
+          <span>6 cursos no painel</span>
+          <span>12 páginas de curso</span>
+          <span>Dados oficiais</span>
+        </div>
+      </div>
+    </header>
+
+    <main id="conteudo">
+      <section class="section" id="panorama">
+        <div class="container">
+          <div class="section-header">
+            <span class="section-tag">Panorama</span>
+            <h2>Indicadores <em>gerais</em></h2>
+            <p>
+              Os números acompanham o tipo de cota selecionado no painel e consideram os seis
+              cursos da UEPG com histórico completo de 2016 a 2025.
+            </p>
+          </div>
+          <div class="kpis" id="cards-resumo"></div>
+        </div>
+      </section>
+
+      <section class="section section--alt" id="grafico">
+        <div class="container">
+          <div class="section-header">
+            <span class="section-tag">Gráfico de linha</span>
+            <h2>Candidatos por <em>vaga</em></h2>
+            <p>
+              Eixo X: anos de 2016 a 2025. Eixo Y: candidatos por vaga. Uma linha para cada
+              curso — clique nos marcadores para incluir ou remover cursos.
+            </p>
+          </div>
+
+          <div class="painel mb-4">
+            <div class="painel-controles">
+              <div class="campo">
+                <label for="select-cota">Tipo de cota</label>
+                <div class="select-wrapper">
+                  <select id="select-cota"></select>
+                </div>
+              </div>
+              <div class="campo">
+                <label for="grupo-cursos">Cursos exibidos</label>
+                <div class="chips" id="grupo-cursos"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grafico-layout" id="grafico-layout">
+            <div class="grafico-container">
+              <h3>Concorrência em cotas públicas — UEPG</h3>
+              <p class="grafico-legenda" id="grafico-subtitulo"></p>
+              <div class="chart-wrapper">
+                <canvas
+                  id="grafico-linha"
+                  role="img"
+                  aria-label="Gráfico de linha com a evolução de candidatos por vaga de 2016 a 2025"
+                ></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="tabela">
+        <div class="container">
+          <div class="section-header">
+            <span class="section-tag">Dados</span>
+            <h2>Tabela de <em>dados</em></h2>
+            <p>
+              Ano, curso, candidatos, vagas, candidatos por vaga, nota mínima de aprovação e
+              salário médio da profissão.
+            </p>
+          </div>
+
+          <div class="filtro-container">
+            <div class="campo">
+              <label for="filtro-ano">Ano</label>
+              <div class="select-wrapper"><select id="filtro-ano"></select></div>
+            </div>
+            <div class="campo">
+              <label for="filtro-curso">Curso</label>
+              <div class="select-wrapper"><select id="filtro-curso"></select></div>
+            </div>
+            <div class="campo">
+              <label for="filtro-ordem">Ordenar por</label>
+              <div class="select-wrapper">
+                <select id="filtro-ordem">
+                  <option value="ano">Ano (crescente)</option>
+                  <option value="concorrencia">Candidatos/vaga (maior primeiro)</option>
+                  <option value="nota">Nota mínima (maior primeiro)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="tabela-container">
+            <table class="tabela-dados">
+              <thead>
+                <tr>
+                  <th scope="col">Ano</th>
+                  <th scope="col">Curso</th>
+                  <th scope="col">Cota</th>
+                  <th scope="col" class="num">Candidatos</th>
+                  <th scope="col" class="num">Vagas</th>
+                  <th scope="col" class="num">Cand./vaga</th>
+                  <th scope="col" class="num">Nota mín.</th>
+                  <th scope="col" class="num">Salário médio*</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-corpo"></tbody>
+            </table>
+            <p class="tabela-legenda" id="tabela-caption"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section--alt" id="analise">
+        <div class="container">
+          <div class="section-header">
+            <span class="section-tag">Estatísticas</span>
+            <h2>Questões para <em>análise</em></h2>
+            <p>
+              Todas as respostas são calculadas em tempo real a partir do banco de dados do
+              projeto, seguindo o tipo de cota selecionado no painel.
+            </p>
+          </div>
+          <div class="accordion" id="acordeao-analise"></div>
+        </div>
+      </section>
+
+      <section class="section" id="cursos">
+        <div class="container">
+          <div class="section-header">
+            <span class="section-tag">Navegação</span>
+            <h2>Explore por <em>curso</em></h2>
+            <p>Cada página traz o gráfico por tipo de cota, a tabela completa e a leitura dos dados.</p>
+            <div class="chips justify-content-center">
+              <a class="chip ativo" href="ranking.html">Ranking por categoria</a>
+              <a class="chip ativo" href="comparar.html">Comparar dois cursos</a>
+              <a class="chip ativo" href="sobre.html">Sobre o site e as cotas</a>
+            </div>
+          </div>
+          <div class="informacoes" id="grade-cursos"></div>
+        </div>
+      </section>
+
+      <section class="section section--alt" id="fontes">
+        <div class="container">
+          <div class="section-header">
+            <span class="section-tag">Metodologia</span>
+            <h2>Fontes dos <em>dados</em></h2>
+          </div>
+          <div class="painel">
+            <ul class="lista-fontes" id="lista-fontes"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script type="module" src="script.js"></script>
+    <script type="module" src="assistente.js"></script>
+  </body>
+</html>
