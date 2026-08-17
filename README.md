@@ -21,10 +21,10 @@ menu lateral. Ver [Ranking e comparação](#ranking-e-comparação).
 A página **Sobre** (`sobre.html`) explica o projeto, o conceito de cota e cada uma das cinco
 modalidades (Universal, Escola Pública, Escola Pública - Negros, Negros e PcD) com exemplo
 montado a partir dos próprios dados, glossário dos indicadores, perguntas frequentes e
-limitações. Em todas as páginas há um **assistente com IA** (`assistente.js`), no botão do
-canto inferior direito, que responde perguntas sobre as cotas, os cursos, os rankings e a
-navegação usando um modelo de linguagem ancorado nas bases do site (com fallback local
-quando a IA está indisponível). Ver [Sobre e assistente](#sobre-e-assistente).
+limitações. Em todas as páginas há o **Gideon**, o assistente com IA (`assistente.js`), no
+botão do canto inferior direito, que responde perguntas sobre as cotas, os cursos, os rankings
+e a navegação — e também perguntas gerais — usando um modelo de linguagem ancorado nas bases
+do site (com fallback local quando a IA está indisponível). Ver [Sobre e assistente](#sobre-e-assistente).
 
 ## Links
 
@@ -58,7 +58,7 @@ quando a IA está indisponível). Ver [Sobre e assistente](#sobre-e-assistente).
 ├── comparar.js         # página de comparação
 ├── sobre.js            # página Sobre: cards das cotas, exemplo real, glossário e FAQ
 ├── conceitos.js        # definições das cotas, indicadores, marco legal e limitações
-├── assistente.js       # assistente com IA presente em todas as páginas (fallback local)
+├── assistente.js       # Gideon, o assistente com IA presente em todas as páginas (fallback local)
 ├── ia-config.js        # configuração da IA (URL do mini-servidor ou chave do Gemini)
 ├── worker/
 │   └── gemini-proxy.js # mini-servidor (Cloudflare Worker) que esconde a chave do Gemini

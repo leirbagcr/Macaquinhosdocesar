@@ -331,9 +331,9 @@ function respostaAjuda() {
 
 function respostaFallback() {
   return (
-    "Não encontrei isso nos dados do site. Eu respondo sobre os 5 tipos de cota, a concorrência " +
-    "de cada curso por ano e modalidade, os rankings (concorrência, salário, duração, nota, " +
-    "crescimento, estabilidade), os indicadores e a navegação. " +
+    "Não encontrei isso nos dados do site. Sem a IA ativada, eu respondo sobre os 5 tipos de " +
+    "cota, a concorrência de cada curso por ano e modalidade, os rankings (concorrência, " +
+    "salário, duração, nota, crescimento, estabilidade), os indicadores e a navegação. " +
     `Se a dúvida for conceitual, a página ${linkPagina("sobre.html", "Sobre")} explica tudo em detalhe.`
   );
 }
@@ -435,12 +435,15 @@ function montarContextoIA() {
   const paginasTexto = PAGINAS.map((p) => `- ${p.nome} (${p.href}): ${p.texto}`).join("\n");
   const limitacoesTexto = LIMITACOES.map((l) => `- ${l}`).join("\n");
   contextoIA =
-    "Você é o assistente de um site que analisa a concorrência (candidatos por vaga) em " +
-    "cotas públicas nos vestibulares da UEPG (2016–2025) e da UTFPR — Câmpus Ponta Grossa " +
-    "(2023–2025). Responda sempre em português do Brasil, de forma curta e objetiva (até 5 " +
-    "frases), usando SOMENTE os dados abaixo e os dados extras enviados em cada pergunta. " +
-    "Nunca invente números: se a informação não estiver nos dados, diga que ela não está na " +
-    "base do site e sugira o que você sabe responder. Pode usar HTML simples (<strong>, <a>).\n\n" +
+    "Você é o Gideon, o assistente de um site que analisa a concorrência (candidatos por " +
+    "vaga) em cotas públicas nos vestibulares da UEPG (2016–2025) e da UTFPR — Câmpus Ponta " +
+    "Grossa (2023–2025). Responda sempre em português do Brasil, de forma curta e objetiva " +
+    "(até 5 frases). Quando a pergunta for sobre os números do site (cotas, cursos, " +
+    "concorrência, notas, salários), use SOMENTE os dados abaixo e os dados extras enviados " +
+    "em cada pergunta — nunca invente números; se a informação não estiver nos dados, diga " +
+    "que ela não está na base do site. Perguntas gerais sobre qualquer outro assunto " +
+    "(estudos, vestibular, curiosidades etc.) você também responde normalmente, com seu " +
+    "próprio conhecimento. Pode usar HTML simples (<strong>, <a>).\n\n" +
     `CURSOS DO SITE:\n${cursosTexto}\n\n` +
     `TIPOS DE COTA:\n${cotasTexto}\n\n` +
     `PÁGINAS DO SITE:\n${paginasTexto}\n\n` +
@@ -481,8 +484,9 @@ async function responderIA(texto, respostaLocal) {
         {
           text:
             `Pergunta do visitante: ${texto}\n\n` +
-            "Dados extras calculados pelo site para esta pergunta (use-os como fonte, " +
-            `reescrevendo com naturalidade):\n${respostaLocal}`,
+            "Dados extras calculados pelo site (use-os como fonte apenas se tiverem relação " +
+            "com a pergunta; se ela for sobre outro assunto, ignore-os e responda com seu " +
+            `próprio conhecimento):\n${respostaLocal}`,
         },
       ],
     },
@@ -536,15 +540,15 @@ export function montarAssistente() {
   botao.id = "assistente-botao";
   botao.type = "button";
   botao.className = "assistente-botao";
-  botao.setAttribute("aria-label", "Abrir assistente do site");
+  botao.setAttribute("aria-label", "Abrir o Gideon, assistente do site");
   botao.innerHTML =
     '<span class="assistente-botao-icone" aria-hidden="true">✦</span>' +
-    '<span class="rotulo">Assistente IA</span>';
+    '<span class="rotulo">Gideon</span>';
 
   const painel = document.createElement("section");
   painel.id = "assistente";
   painel.className = "assistente";
-  painel.setAttribute("aria-label", "Assistente do site");
+  painel.setAttribute("aria-label", "Gideon — assistente do site");
   painel.hidden = true;
   const subtitulo = iaAtiva()
     ? "Gemini · dados oficiais UEPG e UTFPR-PG"
@@ -553,7 +557,7 @@ export function montarAssistente() {
     <header class="assistente-topo">
       <span class="assistente-avatar" aria-hidden="true">✦</span>
       <div class="assistente-ident">
-        <p class="assistente-titulo">Assistente IA</p>
+        <p class="assistente-titulo">Gideon</p>
         <p class="assistente-sub"><span class="assistente-status" aria-hidden="true"></span>${subtitulo}</p>
       </div>
       <button type="button" class="assistente-fechar" aria-label="Fechar assistente">✕</button>
@@ -565,7 +569,7 @@ export function montarAssistente() {
       <input
         id="assistente-entrada"
         type="text"
-        placeholder="Pergunte sobre cotas, cursos ou indicadores"
+        placeholder="Pergunte o que quiser ao Gideon"
       />
       <button type="submit" aria-label="Enviar pergunta">Enviar</button>
     </form>`;
@@ -617,9 +621,9 @@ export function montarAssistente() {
 
   escrever(
     "bot",
-    "Olá! Sou o assistente deste trabalho sobre concorrência em cotas públicas. " +
-      "Pergunte o que quiser sobre as cotas, os cursos e os números do site — as sugestões " +
-      "abaixo são um bom começo.",
+    "Olá! Sou o <strong>Gideon</strong>, o assistente deste trabalho sobre concorrência em " +
+      "cotas públicas. Pergunte o que quiser — sobre as cotas, os cursos e os números do site " +
+      "ou qualquer outra dúvida. As sugestões abaixo são um bom começo.",
   );
 
   formulario.addEventListener("submit", (evento) => {
