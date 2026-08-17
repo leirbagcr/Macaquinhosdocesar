@@ -1,11 +1,12 @@
 /**
- * Assistente do site com IA: as perguntas são respondidas por um modelo de
- * linguagem (via Puter.js, sem chave de API), sempre ancorado nos dados de
- * db.js / db_utfpr.js e nos conceitos de conceitos.js. Se a IA estiver
- * indisponível (sem internet ou serviço fora do ar), o assistente cai no
- * mecanismo local de respostas, que roda inteiro no navegador.
+ * Assistente do site com IA: as perguntas são respondidas pelo Google Gemini
+ * (chave configurada em ia-config.js), sempre ancorado nos dados de
+ * db.js / db_utfpr.js e nos conceitos de conceitos.js. Sem chave ou com a IA
+ * indisponível, o assistente usa o mecanismo local de respostas, que roda
+ * inteiro no navegador.
  */
 import { CATEGORIAS, SIGLA, linhasCurso, resumosCatalogo, serieAnual } from "./catalogo.js";
+import { GEMINI_API_KEY, GEMINI_MODELO } from "./ia-config.js";
 import {
   COTAS,
   COTA_POR_TIPO,
@@ -403,29 +404,14 @@ export function responder(texto) {
   return respostaFallback();
 }
 
-/* ── IA (Puter.js) ───────────────────────────────────── */
+/* ── IA (Google Gemini) ─────────────────────────────── */
 
-const PUTER_URL = "https://js.puter.com/v2/";
-const IA_TIMEOUT_MS = 25000;
-let puterPromise = null;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODELO}:generateContent`;
+const IA_TIMEOUT_MS = 20000;
 let contextoIA = null;
 const historicoIA = [];
 
-function carregarPuter() {
-  if (window.puter?.ai?.chat) return Promise.resolve(window.puter);
-  if (!puterPromise) {
-    puterPromise = new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = PUTER_URL;
-      script.async = true;
-      script.onload = () =>
-        window.puter?.ai?.chat ? resolve(window.puter) : reject(new Error("IA indisponível"));
-      script.onerror = () => reject(new Error("IA indisponível"));
-      document.head.appendChild(script);
-    });
-  }
-  return puterPromise;
-}
+export const iaAtiva = () => Boolean(GEMINI_API_KEY);
 
 /** Resumo compacto das bases, enviado à IA para ancorar as respostas. */
 function montarContextoIA() {
@@ -463,10 +449,9 @@ function montarContextoIA() {
 }
 
 function extrairTextoIA(resposta) {
-  const bruto = resposta?.message?.content ?? resposta;
-  if (typeof bruto === "string") return bruto;
-  if (Array.isArray(bruto)) return bruto.map((parte) => parte?.text ?? "").join("");
-  return "";
+  const partes = resposta?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(partes)) return "";
+  return partes.map((parte) => parte?.text ?? "").join("");
 }
 
 /** Converte a resposta da IA (texto/markdown leve) em HTML seguro. */
@@ -487,27 +472,41 @@ function formatarRespostaIA(texto) {
  * resposta do mecanismo local como dados extras de apoio.
  */
 async function responderIA(texto, respostaLocal) {
-  const puter = await carregarPuter();
-  const mensagens = [
-    { role: "system", content: montarContextoIA() },
+  if (!iaAtiva()) throw new Error("IA não configurada");
+  const contents = [
     ...historicoIA.slice(-6),
     {
       role: "user",
-      content:
-        `Pergunta do visitante: ${texto}\n\n` +
-        "Dados extras calculados pelo site para esta pergunta (use-os como fonte, " +
-        `reescrevendo com naturalidade):\n${respostaLocal}`,
+      parts: [
+        {
+          text:
+            `Pergunta do visitante: ${texto}\n\n` +
+            "Dados extras calculados pelo site para esta pergunta (use-os como fonte, " +
+            `reescrevendo com naturalidade):\n${respostaLocal}`,
+        },
+      ],
     },
   ];
-  const resposta = await Promise.race([
-    puter.ai.chat(mensagens),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("tempo esgotado")), IA_TIMEOUT_MS),
-    ),
-  ]);
-  const conteudo = extrairTextoIA(resposta).trim();
+  const resposta = await fetch(GEMINI_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": GEMINI_API_KEY,
+    },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: montarContextoIA() }] },
+      contents,
+      generationConfig: { temperature: 0.4, maxOutputTokens: 500 },
+    }),
+    signal: AbortSignal.timeout(IA_TIMEOUT_MS),
+  });
+  if (!resposta.ok) throw new Error(`IA respondeu ${resposta.status}`);
+  const conteudo = extrairTextoIA(await resposta.json()).trim();
   if (!conteudo) throw new Error("resposta vazia");
-  historicoIA.push({ role: "user", content: texto }, { role: "assistant", content: conteudo });
+  historicoIA.push(
+    { role: "user", parts: [{ text: texto }] },
+    { role: "model", parts: [{ text: conteudo }] },
+  );
   return formatarRespostaIA(conteudo);
 }
 
@@ -516,6 +515,13 @@ async function responderIA(texto, respostaLocal) {
 function balao(autor, html) {
   const item = document.createElement("div");
   item.className = `chat-msg chat-msg--${autor}`;
+  if (autor === "bot") {
+    const avatar = document.createElement("span");
+    avatar.className = "chat-avatar";
+    avatar.setAttribute("aria-hidden", "true");
+    avatar.textContent = "✦";
+    item.appendChild(avatar);
+  }
   const bolha = document.createElement("div");
   bolha.className = "chat-bolha";
   bolha.innerHTML = html;
@@ -531,20 +537,26 @@ export function montarAssistente() {
   botao.type = "button";
   botao.className = "assistente-botao";
   botao.setAttribute("aria-label", "Abrir assistente do site");
-  botao.innerHTML = '<span aria-hidden="true">💬</span><span class="rotulo">Assistente</span>';
+  botao.innerHTML =
+    '<span class="assistente-botao-icone" aria-hidden="true">✦</span>' +
+    '<span class="rotulo">Assistente IA</span>';
 
   const painel = document.createElement("section");
   painel.id = "assistente";
   painel.className = "assistente";
   painel.setAttribute("aria-label", "Assistente do site");
   painel.hidden = true;
+  const subtitulo = iaAtiva()
+    ? "Gemini · dados oficiais UEPG e UTFPR-PG"
+    : "Dados oficiais UEPG e UTFPR-PG";
   painel.innerHTML = `
     <header class="assistente-topo">
-      <div>
-        <p class="assistente-titulo">Assistente do site</p>
-        <p class="assistente-sub">IA ancorada nos dados de db.js e db_utfpr.js</p>
+      <span class="assistente-avatar" aria-hidden="true">✦</span>
+      <div class="assistente-ident">
+        <p class="assistente-titulo">Assistente IA</p>
+        <p class="assistente-sub"><span class="assistente-status" aria-hidden="true"></span>${subtitulo}</p>
       </div>
-      <button type="button" class="assistente-fechar" aria-label="Fechar assistente">✖</button>
+      <button type="button" class="assistente-fechar" aria-label="Fechar assistente">✕</button>
     </header>
     <div class="assistente-corpo" id="assistente-corpo" role="log" aria-live="polite"></div>
     <div class="assistente-sugestoes" id="assistente-sugestoes"></div>
@@ -572,11 +584,18 @@ export function montarAssistente() {
 
   const perguntar = async (texto) => {
     escrever("usuario", texto.replace(/[<>]/g, ""));
-    const pensando = balao("bot", '<em class="chat-pensando">Pensando\u2026</em>');
+    const respostaLocal = responder(texto);
+    if (!iaAtiva()) {
+      escrever("bot", respostaLocal);
+      return;
+    }
+    const pensando = balao(
+      "bot",
+      '<span class="chat-digitando" aria-label="Pensando"><span></span><span></span><span></span></span>',
+    );
     corpo.appendChild(pensando);
     corpo.scrollTop = corpo.scrollHeight;
     const bolha = pensando.querySelector(".chat-bolha");
-    const respostaLocal = responder(texto);
     try {
       bolha.innerHTML = await responderIA(texto, respostaLocal);
     } catch {
@@ -598,7 +617,7 @@ export function montarAssistente() {
 
   escrever(
     "bot",
-    "Olá! Sou o assistente com IA deste trabalho sobre concorrência em cotas públicas. " +
+    "Olá! Sou o assistente deste trabalho sobre concorrência em cotas públicas. " +
       "Pergunte o que quiser sobre as cotas, os cursos e os números do site — as sugestões " +
       "abaixo são um bom começo.",
   );
